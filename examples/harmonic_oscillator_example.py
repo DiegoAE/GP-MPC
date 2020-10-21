@@ -3,6 +3,9 @@ from sys import path
 import casadi as ca
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.patches import Ellipse
+import matplotlib.transforms as transforms
+
 
 # Add gp_mpc pagkage to path
 path.append(r"./../")
@@ -10,7 +13,7 @@ path.append(r"./../")
 from gp_mpc import Model, GP
 
 
-def plot_van_der_pol():
+def plot():
     """ Plot comparison of GP prediction with exact simulation
         on a 2000 step prediction horizon
     """
@@ -44,14 +47,48 @@ def plot_van_der_pol():
     plt.show()
 
 
+def plot_harmonic_oscillator(time_steps, dt):
+    plt.figure()
+    ax = plt.subplot(111)
+
+    # The initial state is Gaussian distributed with the following moments:
+    mu = np.array([2., .201])
+    Sigma = np.eye(2) * 0.1
+
+    # Linear dynamics of harmonic oscillator:
+    k = 2.0
+    A = np.eye(2) + np.array([[0,1],[-k,0]]) * dt
+
+    mean_traj = np.zeros((time_steps, 2))
+    for t in range(time_steps):
+        confidence_ellipse(ax, mu, Sigma)
+        mu = A @ mu
+        Sigma = A @ Sigma @ A.T
+        mean_traj[t, :] = mu
+
+    ax.plot(mean_traj[:,0], mean_traj[:,1], 'k-', linewidth=1.0, label='Mean')
+    ax.set_ylabel('x2')
+    ax.set_xlabel('x1')
+    plt.legend(loc='best')
+    plt.show()
+
+
 def ode(x, u, z, p):
     """ Harmonic oscillator."""
-    k = 1.0
+    k = 10
     dxdt = [
             x[1],
             -k * x[0]
     ]
     return ca.vertcat(*dxdt)
+
+
+def confidence_ellipse(ax, mu, Sigma, n_std=2):
+    lambda_, v = np.linalg.eig(Sigma)
+    lambda_ = np.sqrt(lambda_)
+    ellipse = Ellipse(mu, width=lambda_[0]*n_std*2, height=lambda_[1]*n_std*2,
+            angle=np.rad2deg(np.arccos(v[0, 0])), facecolor='grey')
+    return ax.add_artist(ellipse)
 
 
 if __name__ == "__main__":
@@ -66,4 +103,4 @@ if __name__ == "__main__":
     R_n = np.eye(Nx) * 1e-6
     dt = 0.01
     model = Model(Nx=Nx, Nu=Nu, ode=ode, dt=dt, R=R_n, clip_negative=True)
-    plot_van_der_pol()
+    plot_harmonic_oscillator(300, dt)
